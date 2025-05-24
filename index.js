@@ -58,7 +58,7 @@ client.on('interactionCreate', async interaction => {
 
     const embed = new EmbedBuilder()
       .setTitle('🎫 Ticket créé')
-      .setDescription(`Merci ${interaction.user} d'avoir contacté **Dream Shop**.\n__Explique ta demande ci-dessous.__`)
+      .setDescription(`Merci ${interaction.user} d'avoir contacté **Kms Shop**.\n__Explique ta demande ci-dessous.__`)
       .setColor('#2f3136');
 
     const button = new ActionRowBuilder().addComponents(
@@ -91,7 +91,7 @@ client.on('ready', async () => {
 
   const embed = new EmbedBuilder()
     .setTitle('Contacter le support')
-    .setDescription('Pour contacter le support de **Dream Shop**, clique sur le bouton __ci-dessous__.\n\n**Rappels :**\n- **__Sois courtois__**\n- **__Sois patient__**\n- **__Ne ping pas le staff__**\n\n**Note :** Nous n’acceptons pas les publicités')
+    .setDescription('Pour contacter le support de **Kms Shop**, clique sur le bouton __ci-dessous__.\n\n**Rappels :**\n- **__Sois courtois__**\n- **__Sois patient__**\n- **__Ne ping pas le staff__**\n\n**Note :** Nous n’acceptons pas les publicités')
     .setColor('#2f3136');
 
   const button = new ActionRowBuilder().addComponents(
