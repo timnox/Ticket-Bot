@@ -17,7 +17,7 @@ client.once('ready', () => {
   console.log(`Connecté en tant que ${client.user.tag}`);
   client.user.setPresence({
     activities: [{
-      name: 'DREAM-SHOP',
+      name: 'KMS-SHOP',
       type: ActivityType.Streaming,
       url: 'https://www.twitch.tv/SupremeB0ts'
     }],
