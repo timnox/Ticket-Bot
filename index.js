@@ -1,9 +1,17 @@
 require('dotenv').config();
 const {
-  Client, GatewayIntentBits, Partials,
-  EmbedBuilder, PermissionsBitField, ButtonBuilder,
-  ActionRowBuilder, ButtonStyle, ModalBuilder,
-  TextInputBuilder, TextInputStyle, AttachmentBuilder
+  Client,
+  GatewayIntentBits,
+  Partials,
+  EmbedBuilder,
+  PermissionsBitField,
+  ButtonBuilder,
+  ActionRowBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ActivityType
 } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
@@ -18,118 +26,134 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-client.once('ready', async () => {
-  console.log(`✅ Connecté en tant que ${client.user.tag}`);
+client.once('ready', () => {
+  console.log(`Connecté en tant que ${client.user.tag}`);
+  client.user.setPresence({
+    activities: [{
+      name: 'Ticket KMS-SHOP',
+      type: ActivityType.Streaming,
+      url: 'https://www.twitch.tv/SupremeB0ts'
+    }],
+    status: 'online'
+  });
+});
+
+client.on('ready', async () => {
   const channel = await client.channels.fetch(process.env.TICKET_CHANNEL_ID);
+  if (!channel) return console.error("Salon introuvable pour les boutons tickets.");
 
   const embed = new EmbedBuilder()
     .setTitle(' Kms • Support ')
     .setDescription(
       `🇫🇷\nTicket abusif ou troll = **ban**\nÉvitez de mentionner le responsable inutilement\nS’il ne répond pas, il n’est pas disponible\nMerci de votre compréhension.\n\n` +
-      `🇬🇧\nAbusive or trolling ticket = **ban**\nAvoid mentioning the manager unnecessarily\nIf they don’t respond, they’re not available\nThank you for your understanding.\n\n-m Kms Ticket`
+      `🇬🇧\nAbusive or trolling ticket = **ban**\nAvoid mentioning the manager unnecessarily\nIf they don’t respond, they’re not available\nThank you for your understanding.\n\n-# Kms Ticket`
     )
     .setColor('#eb37f1')
     .setThumbnail('https://cdn.discordapp.com/attachments/1375912569193234643/1378470888986378311/pp.png?ex=683cb88e&is=683b670e&hm=d5e6fde90f288db55de0255f4715994052fcfc0c9e37f46404741c7ec4916d66&');
 
-  const buttons = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('partenariat').setLabel('Partenariat').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('achat').setLabel('Achat').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('question').setLabel('Question').setStyle(ButtonStyle.Secondary)
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('partenariat')
+      .setLabel('Partenariat')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('achat')
+      .setLabel('Achat')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('question')
+      .setLabel('Question')
+      .setStyle(ButtonStyle.Secondary)
   );
 
-  await channel.send({ embeds: [embed], components: [buttons] });
+  await channel.send({ embeds: [embed], components: [row] });
 });
 
+// CRÉATION DES TICKETS
 client.on('interactionCreate', async interaction => {
   if (interaction.isButton()) {
-    const user = interaction.user;
-    let channelName = '';
-    let pingRoles = [];
-    let isModal = false;
+    let type = interaction.customId;
+    let ticketName = `${type}-${interaction.user.username}`;
+    let rolePing = [];
 
-    if (interaction.customId === 'achat') {
-      channelName = `achat-${user.username}`;
-      pingRoles = ['1375220253553987767'];
-    } else if (interaction.customId === 'partenariat') {
-      channelName = `partenariat-${user.username}`;
-      pingRoles = ['1375220253553987767', '1375220255080714330'];
-    } else if (interaction.customId === 'question') {
-      isModal = true;
+    if (type === 'achat') {
+      rolePing = ['1375220253553987767'];
+    } else if (type === 'partenariat') {
+      rolePing = ['1375220253553987767', '1375220255080714330'];
     }
 
-    if (isModal) {
+    if (type === 'achat' || type === 'partenariat') {
+      const ticketChannel = await interaction.guild.channels.create({
+        name: ticketName.toLowerCase(),
+        type: 0,
+        parent: process.env.TICKET_CATEGORY_ID,
+        permissionOverwrites: [
+          { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+          { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+          ...rolePing.map(id => ({
+            id,
+            allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages]
+          }))
+        ]
+      });
+
+      const embed = new EmbedBuilder()
+        .setTitle('🎫 Ticket ouvert')
+        .setDescription(`Merci ${interaction.user}, explique ta demande ci-dessous.`)
+        .setColor('#eb37f1');
+
+      const closeButton = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('close_ticket')
+          .setLabel('Fermer le ticket')
+          .setStyle(ButtonStyle.Danger)
+      );
+
+      await ticketChannel.send({ content: rolePing.map(r => `<@&${r}>`).join(' '), embeds: [embed], components: [closeButton] });
+
+      await interaction.reply({
+        content: `🎫 Ton ticket a été créé ici : <#${ticketChannel.id}>`,
+        ephemeral: true
+      });
+    }
+
+    if (type === 'question') {
       const modal = new ModalBuilder()
-        .setCustomId('questionModal')
-        .setTitle('❓ Pose ta question');
+        .setCustomId('question_modal')
+        .setTitle('Pose ta question');
 
       const questionInput = new TextInputBuilder()
-        .setCustomId('questionText')
-        .setLabel("Explique ta question")
+        .setCustomId('question_text')
+        .setLabel("Quelle est ta question ?")
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(true);
 
-      modal.addComponents(new ActionRowBuilder().addComponents(questionInput));
-      return await interaction.showModal(modal);
+      const row = new ActionRowBuilder().addComponents(questionInput);
+      modal.addComponents(row);
+      await interaction.showModal(modal);
     }
-
-    // Crée le salon
-    const ticketChannel = await interaction.guild.channels.create({
-      name: channelName,
-      type: 0,
-      parent: process.env.TICKET_CATEGORY_ID,
-      permissionOverwrites: [
-        { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-        { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-        ...pingRoles.map(id => ({ id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }))
-      ]
-    });
-
-    const embed = new EmbedBuilder()
-      .setTitle('🎫 Ticket ouvert')
-      .setDescription(`Merci ${user} d’avoir contacté le support.\nExplique ta demande ci-dessous.`)
-      .setColor('#eb37f1');
-
-    const closeButton = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('close_ticket')
-        .setLabel('Fermer le ticket')
-        .setStyle(ButtonStyle.Danger)
-    );
-
-    const message = await ticketChannel.send({
-      content: pingRoles.map(r => `<@&${r}>`).join(' '),
-      embeds: [embed],
-      components: [closeButton]
-    });
-
-    await message.pin();
-
-    await interaction.reply({ content: `✅ Ton ticket est créé ici : <#${ticketChannel.id}>`, ephemeral: true });
-
-    ticketChannel.setTopic(`Ouvert par ${user.tag} (${user.id})`);
-    ticketChannel.createdBy = user.id;
   }
 
-  if (interaction.isModalSubmit() && interaction.customId === 'questionModal') {
-    const user = interaction.user;
-    const content = interaction.fields.getTextInputValue('questionText');
-    const channelName = `question-${user.username}`;
-    const pingRoles = ['1375220255080714330'];
+  if (interaction.isModalSubmit() && interaction.customId === 'question_modal') {
+    const userQuestion = interaction.fields.getTextInputValue('question_text');
 
     const ticketChannel = await interaction.guild.channels.create({
-      name: channelName,
+      name: `question-${interaction.user.username}`,
       type: 0,
       parent: process.env.TICKET_CATEGORY_ID,
       permissionOverwrites: [
         { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-        { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-        ...pingRoles.map(id => ({ id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }))
+        { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+        {
+          id: '1375220255080714330',
+          allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages]
+        }
       ]
     });
 
     const embed = new EmbedBuilder()
-      .setTitle('❓ Question reçue')
-      .setDescription(`Merci ${user} ! Voici ta question :\n> ${content}`)
+      .setTitle('❓ Question posée')
+      .setDescription(`> ${userQuestion}`)
       .setColor('#eb37f1');
 
     const closeButton = new ActionRowBuilder().addComponents(
@@ -139,66 +163,49 @@ client.on('interactionCreate', async interaction => {
         .setStyle(ButtonStyle.Danger)
     );
 
-    const message = await ticketChannel.send({
-      content: pingRoles.map(r => `<@&${r}>`).join(' '),
+    await ticketChannel.send({
+      content: '<@&1375220255080714330>',
       embeds: [embed],
       components: [closeButton]
     });
 
-    await message.pin();
-
-    await interaction.reply({ content: `✅ Ta question a été envoyée ici : <#${ticketChannel.id}>`, ephemeral: true });
-
-    ticketChannel.setTopic(`Ouvert par ${user.tag} (${user.id})`);
-    ticketChannel.createdBy = user.id;
+    await interaction.reply({
+      content: `❓ Ta question a été envoyée ici : <#${ticketChannel.id}>`,
+      ephemeral: true
+    });
   }
 
   if (interaction.isButton() && interaction.customId === 'close_ticket') {
     const channel = interaction.channel;
-    const closer = interaction.user;
+    const messages = await channel.messages.fetch({ limit: 100 });
+    const content = messages
+      .map(m => `${m.author.tag}: ${m.content}`)
+      .reverse()
+      .join('\n');
 
-    await interaction.reply({
-      embeds: [new EmbedBuilder()
-        .setColor('#eb37f1')
-        .setDescription('🕐 Ce ticket sera fermé dans 5 secondes...')
-      ],
-      ephemeral: true
+    const transcriptPath = path.join(__dirname, `transcript-${channel.id}.txt`);
+    fs.writeFileSync(transcriptPath, content);
+
+    const uniqueUsers = [...new Set(messages.map(m => m.author.tag))];
+
+    const logChannel = await interaction.guild.channels.fetch(process.env.LOG_CHANNEL_ID);
+    const embed = new EmbedBuilder()
+      .setTitle('📁 Ticket fermé')
+      .setColor('#2f3136')
+      .addFields(
+        { name: '👤 Ouvert par', value: `${channel.name.split('-')[1]}`, inline: true },
+        { name: '❌ Fermé par', value: `${interaction.user.tag}`, inline: true },
+        { name: '🕒 Fermeture', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false },
+        { name: '🧾 Utilisateurs ayant parlé', value: uniqueUsers.join(', ') || 'Aucun' }
+      );
+
+    await logChannel.send({
+      embeds: [embed],
+      files: [transcriptPath]
     });
 
-    setTimeout(async () => {
-      // Génère transcript
-      const messages = await channel.messages.fetch({ limit: 100 });
-      const content = messages
-        .filter(m => !m.author.bot)
-        .map(m => `[${m.createdAt.toISOString()}] ${m.author.tag}: ${m.content}`)
-        .reverse()
-        .join('\n');
-
-      const transcriptPath = path.join(__dirname, `transcript-${channel.id}.txt`);
-      fs.writeFileSync(transcriptPath, content);
-
-      const participants = [...new Set(messages.map(m => m.author.tag))].join(', ');
-
-      const logChannel = await client.channels.fetch(process.env.TICKET_LOG_CHANNEL_ID);
-      await logChannel.send({
-        embeds: [
-          new EmbedBuilder()
-            .setTitle(`📁 Ticket fermé`)
-            .addFields(
-              { name: 'Salon', value: `#${channel.name}`, inline: true },
-              { name: 'Ouvert par', value: channel.topic || 'inconnu', inline: true },
-              { name: 'Fermé par', value: closer.tag, inline: true },
-              { name: 'Utilisateurs', value: participants }
-            )
-            .setFooter({ text: `Fermé le ${new Date().toLocaleString()}` })
-            .setColor('#2f3136')
-        ],
-        files: [new AttachmentBuilder(transcriptPath)]
-      });
-
-      await channel.delete();
-      fs.unlinkSync(transcriptPath);
-    }, 5000);
+    fs.unlinkSync(transcriptPath); // supprime le fichier local
+    await channel.delete();
   }
 });
 
