@@ -8,7 +8,8 @@ const {
   ButtonBuilder,
   ActionRowBuilder,
   ButtonStyle,
-  ActivityType
+  ActivityType,
+  ChannelType
 } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
@@ -39,10 +40,21 @@ client.on('interactionCreate', async interaction => {
   if (!interaction.isButton()) return;
 
   if (interaction.customId === 'create_ticket') {
+    // Vérifie s’il existe déjà un ticket
+    const existing = interaction.guild.channels.cache.find(
+      c => c.name === `ticket-${interaction.user.username.toLowerCase()}`
+    );
+    if (existing) {
+      return interaction.reply({
+        content: `❗ Tu as déjà un ticket ouvert : <#${existing.id}>`,
+        ephemeral: true
+      });
+    }
+
     const channel = await interaction.guild.channels.create({
       name: `ticket-${interaction.user.username}`,
-      type: 0, // GUILD_TEXT
-      parent: process.env.TICKET_CATEGORY_ID, // ID de la catégorie définie dans .env
+      type: ChannelType.GuildText,
+      parent: process.env.TICKET_CATEGORY_ID,
       permissionOverwrites: [
         {
           id: interaction.guild.id,
@@ -72,19 +84,17 @@ client.on('interactionCreate', async interaction => {
       .setDescription(`Merci ${interaction.user} d'avoir contacté **Kms Shop**.\n__Explique ta demande ci-dessous.__`)
       .setColor('#eb37f1');
 
-    const button = new ActionRowBuilder().addComponents(
+    const closeButton = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('close_ticket')
         .setLabel('Fermer le ticket')
         .setStyle(ButtonStyle.Danger)
     );
 
-    const ticketMessage = await channel.send({ embeds: [embed], components: [button] });
-    await ticketMessage.pin();
+    const msg = await channel.send({ embeds: [embed], components: [closeButton] });
+    await msg.pin();
 
-    await channel.send({
-      content: `<@&1375220253553987767> <@&1375220255080714330> <@&1375220249124798485>`
-    });
+    await channel.send({ content: `<@&1375220253553987767> <@&1375220255080714330> <@&1375220249124798485>` });
 
     await interaction.reply({
       content: `🎫 Ton ticket a été créé ici : <#${channel.id}>`,
@@ -92,8 +102,80 @@ client.on('interactionCreate', async interaction => {
     });
   }
 
+  // Étape 1 : demande confirmation
   if (interaction.customId === 'close_ticket') {
-    await interaction.channel.delete();
+    const confirmRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('confirm_close')
+        .setLabel('✅ Confirmer')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('cancel_close')
+        .setLabel('❌ Annuler')
+        .setStyle(ButtonStyle.Secondary)
+    );
+
+    const confirmEmbed = new EmbedBuilder()
+      .setColor('#eb37f1')
+      .setTitle('❗ Confirmation')
+      .setDescription('Es-tu sûr de vouloir fermer ce ticket ?');
+
+    await interaction.reply({ embeds: [confirmEmbed], components: [confirmRow], ephemeral: true });
+  }
+
+  // Étape 2 : fermeture confirmée
+  if (interaction.customId === 'confirm_close') {
+    await interaction.update({
+      embeds: [
+        new EmbedBuilder()
+          .setColor('#eb37f1')
+          .setDescription('🔒 **Ce ticket sera fermé dans 5 secondes...**')
+      ],
+      components: []
+    });
+
+    const channel = interaction.channel;
+
+    const messages = await channel.messages.fetch({ limit: 100 });
+    const transcript = messages
+      .reverse()
+      .map(m => `${m.author.tag}: ${m.content}`)
+      .join('\n');
+
+    const filePath = path.join(__dirname, `transcript-${channel.id}.txt`);
+    fs.writeFileSync(filePath, transcript);
+
+    const logChannel = await client.channels.fetch(process.env.TICKET_LOG_CHANNEL_ID);
+    const creator = channel.permissionOverwrites.cache.find(perm => perm.allow.has(PermissionsBitField.Flags.SendMessages) && perm.type === 1);
+
+    const logEmbed = new EmbedBuilder()
+      .setColor('#eb37f1')
+      .setTitle('📁 Ticket fermé')
+      .addFields(
+        { name: '📌 Salon', value: `#${channel.name}`, inline: true },
+        { name: '👤 Créé par', value: `<@${creator?.id || 'inconnu'}>`, inline: true },
+        { name: '❌ Fermé par', value: `<@${interaction.user.id}>`, inline: true }
+      )
+      .setTimestamp();
+
+    await logChannel.send({
+      embeds: [logEmbed],
+      files: [filePath]
+    });
+
+    setTimeout(() => {
+      fs.unlinkSync(filePath);
+      channel.delete().catch(console.error);
+    }, 5000);
+  }
+
+  if (interaction.customId === 'cancel_close') {
+    await interaction.update({
+      content: '❌ Fermeture annulée.',
+      components: [],
+      embeds: [],
+      ephemeral: true
+    });
   }
 });
 
