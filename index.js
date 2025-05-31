@@ -164,7 +164,19 @@ client.on('ready', async () => {
 
   const embed = new EmbedBuilder()
     .setTitle('🎫 Kms • Support ✨')
-    .setDescription('🇫🇷\nTicket abusif ou troll = **ban**\nÉvitez de mentionner le responsable inutilement\nS'il ne répond pas, il n'est pas disponible\nMerci de votre compréhension.\n\n🇬🇧\nAbusive or trolling ticket = **ban**\nAvoid mentioning the manager unnecessarily\nIf they don’t respond, they’re not available\nThank you for your understanding.\n\nZnk's Gestion')
+.setDescription(`🇫🇷
+Ticket abusif ou troll = **ban**
+Évitez de mentionner le responsable inutilement
+S'il ne répond pas, il n’est pas disponible
+Merci de votre compréhension.
+
+🇬🇧
+Abusive or trolling ticket = **ban**
+Avoid mentioning the manager unnecessarily
+If they don't respond, they're not available
+Thank you for your understanding.
+
+Kms Gestion`)
     .setColor('#eb37f1')
     .setThumbnail('https://cdn.discordapp.com/attachments/1375912569193234643/1378470888986378311/pp.png?ex=683cb88e&is=683b670e&hm=d5e6fde90f288db55de0255f4715994052fcfc0c9e37f46404741c7ec4916d66&');
 
