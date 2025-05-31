@@ -12,7 +12,6 @@ const {
   ChannelType
 } = require('discord.js');
 const fs = require('fs');
-const path = require('path');
 
 const client = new Client({
   intents: [
@@ -124,7 +123,6 @@ client.on('interactionCreate', async interaction => {
   if (interaction.customId === 'confirm_close') {
     const channel = interaction.channel;
 
-    // Transcript
     const messages = await channel.messages.fetch({ limit: 100 });
     const content = messages
       .reverse()
@@ -135,7 +133,6 @@ client.on('interactionCreate', async interaction => {
     fs.mkdirSync('./transcripts', { recursive: true });
     fs.writeFileSync(transcriptPath, content);
 
-    // Annonce de fermeture
     const closingEmbed = new EmbedBuilder()
       .setColor('#eb37f1')
       .setTitle('Fermeture du ticket')
@@ -143,7 +140,6 @@ client.on('interactionCreate', async interaction => {
 
     await interaction.update({ embeds: [closingEmbed], components: [] });
 
-    // Log + fichier dans salon
     const logChannel = await client.channels.fetch(process.env.LOG_CHANNEL_ID);
     const logEmbed = new EmbedBuilder()
       .setColor('#eb37f1')
@@ -159,10 +155,9 @@ client.on('interactionCreate', async interaction => {
       files: [transcriptPath]
     });
 
-    // Supprimer après 5s
     setTimeout(() => {
       channel.delete().catch(console.error);
-      fs.unlinkSync(transcriptPath); // Nettoyage du fichier
+      fs.unlinkSync(transcriptPath);
     }, 5000);
   }
 });
