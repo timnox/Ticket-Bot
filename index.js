@@ -38,7 +38,7 @@ client.once('ready', () => {
 
 client.on('interactionCreate', async interaction => {
   if (!interaction.isButton()) return;
-}
+
   if (interaction.customId === 'create_ticket') {
     const channel = await interaction.guild.channels.create({
       name: `ticket-${interaction.user.username}`,
@@ -93,7 +93,6 @@ client.on('interactionCreate', async interaction => {
     });
   }
 
-  // Étape 1 : Confirmation
   if (interaction.customId === 'close_ticket') {
     const confirmEmbed = new EmbedBuilder()
       .setColor('#eb37f1')
@@ -114,7 +113,6 @@ client.on('interactionCreate', async interaction => {
     await interaction.reply({ embeds: [confirmEmbed], components: [row], ephemeral: true });
   }
 
-  // Étape 2 : Annuler
   if (interaction.customId === 'cancel_close') {
     await interaction.update({
       content: '❌ Fermeture annulée.',
@@ -123,7 +121,6 @@ client.on('interactionCreate', async interaction => {
     });
   }
 
-  // Étape 3 : Confirmer fermeture
   if (interaction.customId === 'confirm_close') {
     const channel = interaction.channel;
 
@@ -166,4 +163,8 @@ client.on('interactionCreate', async interaction => {
     setTimeout(() => {
       channel.delete().catch(console.error);
       fs.unlinkSync(transcriptPath); // Nettoyage du fichier
-    }, 5000
+    }, 5000);
+  }
+});
+
+client.login(process.env.TOKEN);
