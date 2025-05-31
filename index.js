@@ -91,7 +91,7 @@ client.on('ready', async () => {
 
   const embed = new EmbedBuilder()
     .setTitle('Contacter le support')
-    .setDescription('Pour contacter le support de **Kms Shop**, clique sur le bouton __ci-dessous__.\n\n**Rappels :**\n- **__Sois courtois__**\n- **__Sois patient__**\n- **__Ne ping pas le staff__**\n\n**Note :** Nous n’acceptons pas les publicités')
+    .setDescription('Pour contacter le support de **Kms Shop**, clique sur le bouton __ci-dessous__.\n\n**Rappels :**\n- **__Sois courtois__**\n- **__Sois patient__**\n- **__Ne ping pas le staff__**\n\n**Note :** -# Nous n’acceptons pas les publicités & partenariat.')
     .setColor('#2f3136');
 
   const button = new ActionRowBuilder().addComponents(
