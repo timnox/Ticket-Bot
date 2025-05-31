@@ -23,8 +23,8 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-client.once('ready', () => {
-  console.log(`Connecté en tant que ${client.user.tag}`);
+client.once('ready', async () => {
+  console.log(`✅ Connecté en tant que ${client.user.tag}`);
   client.user.setPresence({
     activities: [{
       name: 'Ticket KMS-SHOP',
@@ -33,6 +33,22 @@ client.once('ready', () => {
     }],
     status: 'online'
   });
+
+  // Envoie le bouton de création de ticket dans le salon défini
+  const ticketChannel = await client.channels.fetch(process.env.TICKET_CHANNEL_ID);
+  const embed = new EmbedBuilder()
+    .setTitle('📨 Ouvre un ticket')
+    .setDescription('Clique sur le bouton ci-dessous pour créer un ticket.')
+    .setColor('#eb37f1');
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('create_ticket')
+      .setLabel('🎫 Créer un ticket')
+      .setStyle(ButtonStyle.Primary)
+  );
+
+  ticketChannel.send({ embeds: [embed], components: [row] });
 });
 
 client.on('interactionCreate', async interaction => {
@@ -140,7 +156,7 @@ client.on('interactionCreate', async interaction => {
 
     await interaction.update({ embeds: [closingEmbed], components: [] });
 
-    const logChannel = await client.channels.fetch(process.env.LOG_CHANNEL_ID);
+    const logChannel = await client.channels.fetch(process.env.TICKET_LOG_CHANNEL_ID);
     const logEmbed = new EmbedBuilder()
       .setColor('#eb37f1')
       .setTitle('📁 Ticket fermé')
