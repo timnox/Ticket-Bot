@@ -1,3 +1,4 @@
+
 require('dotenv').config();
 const {
   Client,
@@ -27,7 +28,7 @@ const client = new Client({
 });
 
 client.once('ready', () => {
-  console.log(`Connecté en tant que ${client.user.tag}`);
+  console.log(`✅ Connecté en tant que ${client.user.tag}`);
   client.user.setPresence({
     activities: [{
       name: 'Ticket KMS-SHOP',
@@ -38,175 +39,185 @@ client.once('ready', () => {
   });
 });
 
-client.on('ready', async () => {
-  const channel = await client.channels.fetch(process.env.TICKET_CHANNEL_ID);
-  if (!channel) return console.error("Salon introuvable pour les boutons tickets.");
-
-  const embed = new EmbedBuilder()
-    .setTitle(' Kms • Support ')
-    .setDescription(
-      `🇫🇷\nTicket abusif ou troll = **ban**\nÉvitez de mentionner le responsable inutilement\nS’il ne répond pas, il n’est pas disponible\nMerci de votre compréhension.\n\n` +
-      `🇬🇧\nAbusive or trolling ticket = **ban**\nAvoid mentioning the manager unnecessarily\nIf they don’t respond, they’re not available\nThank you for your understanding.\n\n-# Kms Ticket`
-    )
-    .setColor('#eb37f1')
-    .setThumbnail('https://cdn.discordapp.com/attachments/1375912569193234643/1378470888986378311/pp.png?ex=683cb88e&is=683b670e&hm=d5e6fde90f288db55de0255f4715994052fcfc0c9e37f46404741c7ec4916d66&');
-
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('partenariat')
-      .setLabel('Partenariat')
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId('achat')
-      .setLabel('Achat')
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId('question')
-      .setLabel('Question')
-      .setStyle(ButtonStyle.Secondary)
-  );
-
-  await channel.send({ embeds: [embed], components: [row] });
-});
-
-// CRÉATION DES TICKETS
+// Handle ticket creation buttons
 client.on('interactionCreate', async interaction => {
   if (interaction.isButton()) {
-    let type = interaction.customId;
-    let ticketName = `${type}-${interaction.user.username}`;
-    let rolePing = [];
+    const user = interaction.user;
+    let channelName = '';
+    let pingRoles = [];
 
-    if (type === 'achat') {
-      rolePing = ['1375220253553987767'];
-    } else if (type === 'partenariat') {
-      rolePing = ['1375220253553987767', '1375220255080714330'];
+    if (interaction.customId === 'achat') {
+      channelName = `achat-${user.username}`;
+      pingRoles = ['1375220253553987767'];
+    } else if (interaction.customId === 'partenariat') {
+      channelName = `partenariat-${user.username}`;
+      pingRoles = ['1375220253553987767', '1375220255080714330'];
     }
 
-    if (type === 'achat' || type === 'partenariat') {
+    if (channelName) {
       const ticketChannel = await interaction.guild.channels.create({
-        name: ticketName.toLowerCase(),
+        name: channelName,
         type: 0,
         parent: process.env.TICKET_CATEGORY_ID,
         permissionOverwrites: [
-          { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-          { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-          ...rolePing.map(id => ({
-            id,
-            allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages]
+          {
+            id: interaction.guild.id,
+            deny: [PermissionsBitField.Flags.ViewChannel],
+          },
+          {
+            id: user.id,
+            allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
+          },
+          ...pingRoles.map(roleId => ({
+            id: roleId,
+            allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
           }))
-        ]
+        ],
       });
 
       const embed = new EmbedBuilder()
-        .setTitle('🎫 Ticket ouvert')
-        .setDescription(`Merci ${interaction.user}, explique ta demande ci-dessous.`)
+        .setTitle('🎫 Ticket créé')
+        .setDescription(`Merci ${user} d'avoir contacté **Kms Shop**.\nExplique ta demande ci-dessous.`)
         .setColor('#eb37f1');
 
-      const closeButton = new ActionRowBuilder().addComponents(
+      const button = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId('close_ticket')
           .setLabel('Fermer le ticket')
           .setStyle(ButtonStyle.Danger)
       );
 
-      await ticketChannel.send({ content: rolePing.map(r => `<@&${r}>`).join(' '), embeds: [embed], components: [closeButton] });
-
-      await interaction.reply({
-        content: `🎫 Ton ticket a été créé ici : <#${ticketChannel.id}>`,
-        ephemeral: true
-      });
+      await ticketChannel.send({ content: pingRoles.map(r => `<@&${r}>`).join(' '), embeds: [embed], components: [button] });
+      await interaction.reply({ content: `🎫 Ton ticket a été créé ici : <#${ticketChannel.id}>`, ephemeral: true });
     }
 
-    if (type === 'question') {
+    if (interaction.customId === 'question') {
       const modal = new ModalBuilder()
-        .setCustomId('question_modal')
-        .setTitle('Pose ta question');
+        .setCustomId('modal_question')
+        .setTitle('Poser une question');
 
-      const questionInput = new TextInputBuilder()
-        .setCustomId('question_text')
-        .setLabel("Quelle est ta question ?")
+      const input = new TextInputBuilder()
+        .setCustomId('question_content')
+        .setLabel('Quelle est votre question ?')
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(true);
 
-      const row = new ActionRowBuilder().addComponents(questionInput);
+      const row = new ActionRowBuilder().addComponents(input);
       modal.addComponents(row);
       await interaction.showModal(modal);
     }
+
+    if (interaction.customId === 'close_ticket') {
+      await interaction.deferUpdate();
+
+      const channel = interaction.channel;
+      const messages = await channel.messages.fetch({ limit: 100 });
+      const transcript = messages
+        .map(m => `${m.author.tag}: ${m.content}`)
+        .reverse()
+        .join('\n');
+
+      const transcriptPath = path.join(__dirname, `transcript-${channel.id}.txt`);
+      fs.writeFileSync(transcriptPath, transcript);
+
+      const logChannel = await interaction.guild.channels.fetch(process.env.LOG_CHANNEL_ID);
+      const uniqueUsers = [...new Set(messages.map(m => m.author.tag))];
+
+      const logEmbed = new EmbedBuilder()
+        .setColor('#2f3136')
+        .setTitle('Ticket fermé')
+        .addFields(
+          { name: 'Salon', value: channel.name, inline: true },
+          { name: 'Fermé par', value: interaction.user.tag, inline: true },
+          { name: 'Heure de fermeture', value: `<t:${Math.floor(Date.now() / 1000)}:F>` },
+          { name: 'Utilisateurs ayant parlé', value: uniqueUsers.join(', ') || 'Aucun' }
+        );
+
+      await logChannel.send({ embeds: [logEmbed], files: [transcriptPath] });
+      fs.unlinkSync(transcriptPath);
+
+      const confirmEmbed = new EmbedBuilder()
+        .setColor('#2f3136')
+        .setDescription('Le ticket sera fermé dans **5 secondes**...');
+      await channel.send({ embeds: [confirmEmbed] });
+
+      setTimeout(async () => {
+        if (channel && channel.deletable) await channel.delete().catch(console.error);
+      }, 5000);
+    }
   }
 
-  if (interaction.isModalSubmit() && interaction.customId === 'question_modal') {
-    const userQuestion = interaction.fields.getTextInputValue('question_text');
+  if (interaction.isModalSubmit() && interaction.customId === 'modal_question') {
+    const content = interaction.fields.getTextInputValue('question_content');
+    const user = interaction.user;
 
     const ticketChannel = await interaction.guild.channels.create({
-      name: `question-${interaction.user.username}`,
+      name: `question-${user.username}`,
       type: 0,
       parent: process.env.TICKET_CATEGORY_ID,
       permissionOverwrites: [
-        { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-        { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+        {
+          id: interaction.guild.id,
+          deny: [PermissionsBitField.Flags.ViewChannel],
+        },
+        {
+          id: user.id,
+          allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
+        },
         {
           id: '1375220255080714330',
-          allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages]
+          allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
         }
-      ]
+      ],
     });
 
     const embed = new EmbedBuilder()
-      .setTitle('❓ Question posée')
-      .setDescription(`> ${userQuestion}`)
+      .setTitle('❓ Nouvelle question reçue')
+      .addFields(
+        { name: 'Auteur', value: `${user.tag}`, inline: true },
+        { name: 'Contenu de la question', value: content }
+      )
       .setColor('#eb37f1');
 
-    const closeButton = new ActionRowBuilder().addComponents(
+    const button = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('close_ticket')
         .setLabel('Fermer le ticket')
         .setStyle(ButtonStyle.Danger)
     );
 
-    await ticketChannel.send({
-      content: '<@&1375220255080714330>',
-      embeds: [embed],
-      components: [closeButton]
-    });
-
-    await interaction.reply({
-      content: `❓ Ta question a été envoyée ici : <#${ticketChannel.id}>`,
-      ephemeral: true
-    });
+    await ticketChannel.send({ content: `<@&1375220255080714330>`, embeds: [embed], components: [button] });
+    await interaction.reply({ content: `✅ Votre question a été envoyée ici : <#${ticketChannel.id}>`, ephemeral: true });
   }
+});
 
-  if (interaction.isButton() && interaction.customId === 'close_ticket') {
-    const channel = interaction.channel;
-    const messages = await channel.messages.fetch({ limit: 100 });
-    const content = messages
-      .map(m => `${m.author.tag}: ${m.content}`)
-      .reverse()
-      .join('\n');
+client.on('ready', async () => {
+  const channel = await client.channels.fetch(process.env.TICKET_CHANNEL_ID);
 
-    const transcriptPath = path.join(__dirname, `transcript-${channel.id}.txt`);
-    fs.writeFileSync(transcriptPath, content);
+  const embed = new EmbedBuilder()
+    .setTitle('Contacter le support')
+    .setDescription('🇫🇷 Ticket abusif ou troll = ban
+Évitez de mentionner le responsable inutilement
+S’il ne répond pas, il n’est pas disponible
+Merci de votre compréhension.\n- Soyez courtois\n- Ne pingez pas inutilement\n\n**❌ Pub & partenariat non sollicités interdits**')
+    .setColor('#eb37f1');
 
-    const uniqueUsers = [...new Set(messages.map(m => m.author.tag))];
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('achat')
+      .setLabel(' Achat')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('partenariat')
+      .setLabel(' Partenariat')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('question')
+      .setLabel(' Question')
+      .setStyle(ButtonStyle.Success)
+  );
 
-    const logChannel = await interaction.guild.channels.fetch(process.env.LOG_CHANNEL_ID);
-    const embed = new EmbedBuilder()
-      .setTitle('📁 Ticket fermé')
-      .setColor('#2f3136')
-      .addFields(
-        { name: '👤 Ouvert par', value: `${channel.name.split('-')[1]}`, inline: true },
-        { name: '❌ Fermé par', value: `${interaction.user.tag}`, inline: true },
-        { name: '🕒 Fermeture', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false },
-        { name: '🧾 Utilisateurs ayant parlé', value: uniqueUsers.join(', ') || 'Aucun' }
-      );
-
-    await logChannel.send({
-      embeds: [embed],
-      files: [transcriptPath]
-    });
-
-    fs.unlinkSync(transcriptPath); // supprime le fichier local
-    await channel.delete();
-  }
+  await channel.send({ embeds: [embed], components: [row] });
 });
 
 client.login(process.env.TOKEN);
