@@ -195,11 +195,10 @@ client.on('ready', async () => {
   const channel = await client.channels.fetch(process.env.TICKET_CHANNEL_ID);
 
   const embed = new EmbedBuilder()
-    .setTitle('Contacter le support')
-    .setDescription('🇫🇷 Ticket abusif ou troll = ban
-Évitez de mentionner le responsable inutilement
-S’il ne répond pas, il n’est pas disponible
-Merci de votre compréhension.\n- Soyez courtois\n- Ne pingez pas inutilement\n\n**❌ Pub & partenariat non sollicités interdits**')
+    .setTitle('Support・Kms')
+    .setDescription(`🇫🇷\nTicket abusif ou troll = **ban**\n*Évitez de mentionner le responsable inutilement*\n*S’il ne répond pas, il n’est pas disponible*\nMerci de votre compréhension.\n\n` +
+  `🇬🇧\nAbusive or trolling ticket = **ban**\n*Avoid mentioning the manager unnecessarily*\n*If they don’t respond, they’re not available*\nThank you for your understanding.\n\n-# Équipe Kms-Shop.`)
+
     .setColor('#eb37f1');
 
   const row = new ActionRowBuilder().addComponents(
