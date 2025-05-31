@@ -1,5 +1,15 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, EmbedBuilder, PermissionsBitField, ButtonBuilder, ActionRowBuilder, ButtonStyle, ActivityType } = require('discord.js');
+const {
+  Client,
+  GatewayIntentBits,
+  Partials,
+  EmbedBuilder,
+  PermissionsBitField,
+  ButtonBuilder,
+  ActionRowBuilder,
+  ButtonStyle,
+  ActivityType
+} = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
@@ -32,6 +42,7 @@ client.on('interactionCreate', async interaction => {
     const channel = await interaction.guild.channels.create({
       name: `ticket-${interaction.user.username}`,
       type: 0, // GUILD_TEXT
+      parent: process.env.TICKET_CATEGORY_ID, // ID de la catégorie définie dans .env
       permissionOverwrites: [
         {
           id: interaction.guild.id,
@@ -59,7 +70,7 @@ client.on('interactionCreate', async interaction => {
     const embed = new EmbedBuilder()
       .setTitle('🎫 Ticket créé')
       .setDescription(`Merci ${interaction.user} d'avoir contacté **Kms Shop**.\n__Explique ta demande ci-dessous.__`)
-      .setColor('#2f3136');
+      .setColor('#eb37f1');
 
     const button = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -92,7 +103,7 @@ client.on('ready', async () => {
   const embed = new EmbedBuilder()
     .setTitle('Contacter le support')
     .setDescription('Pour contacter le support de **Kms Shop**, clique sur le bouton __ci-dessous__.\n\n**Rappels :**\n- **__Sois courtois__**\n- **__Sois patient__**\n- **__Ne ping pas le staff__**\n\n-# **Note:** __***Nous n’acceptons pas les publicités & partenariat.***__')
-    .setColor('#2f3136');
+    .setColor('#eb37f1');
 
   const button = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
