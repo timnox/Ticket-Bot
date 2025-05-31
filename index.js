@@ -1,8 +1,18 @@
 require('dotenv').config();
 const {
-  Client, GatewayIntentBits, Partials, EmbedBuilder,
-  PermissionsBitField, ButtonBuilder, ActionRowBuilder,
-  ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ActivityType
+  Client,
+  GatewayIntentBits,
+  Partials,
+  EmbedBuilder,
+  PermissionsBitField,
+  ButtonBuilder,
+  ActionRowBuilder,
+  ButtonStyle,
+  ActivityType,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  Events
 } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
@@ -17,6 +27,9 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
+const LOG_CHANNEL_ID = process.env.LOG_CHANNEL_ID;
+const CATEGORY_ID = process.env.TICKET_CATEGORY_ID;
+
 client.once('ready', () => {
   console.log(`✅ Connecté en tant que ${client.user.tag}`);
   client.user.setPresence({
@@ -27,50 +40,57 @@ client.once('ready', () => {
     }],
     status: 'online'
   });
-
-  sendTicketPanel();
 });
 
-async function sendTicketPanel() {
+client.on('ready', async () => {
   const channel = await client.channels.fetch(process.env.TICKET_CHANNEL_ID);
-  if (!channel) return console.log("Salon d'accueil non trouvé.");
+  if (!channel) return;
 
   const embed = new EmbedBuilder()
-    .setTitle('Kms・Support')
+    .setTitle('🎟️ Support - KMS SHOP')
     .setColor('#eb37f1')
-    .setDescription('` 🇫🇷 ` Choisissez une __catégorie__ ci-dessous pour __ouvrir__ un ticket.\n` 🇬🇧 ` Choose a __category__ below to __open__ a ticket.\n\n***__Règles :__***\n`-` **__Pas de spam__**\n **__Restez respectueux__**\n`-` Les tickets abusifs seront **__sanctionnés__**\n -# __Kms Ticket__');
-    
-  const buttons = new ActionRowBuilder().addComponents(
+    .setDescription(`🇫🇷 Sélectionne une catégorie pour ouvrir un ticket :\n\n・**Achat** : pour passer une commande\n・**Partenariat** : demande de partenariat\n・**Question** : poser une question rapidement\n\n🇬🇧 Select a category to open a ticket.`);
+
+  const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId('ticket_achat')
-      .setLabel('Achat')
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId('ticket_partenariat')
-      .setLabel('Partenariat')
+      .setCustomId('achat')
+      .setLabel('🛒 Achat')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
-      .setCustomId('ticket_question')
-      .setLabel('Question')
-      .setStyle(ButtonStyle.Secondary)
+      .setCustomId('partenariat')
+      .setLabel('🤝 Partenariat')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('question')
+      .setLabel('❓ Question')
+      .setStyle(ButtonStyle.Success)
   );
 
-  await channel.send({ embeds: [embed], components: [buttons] });
-}
+  await channel.send({ embeds: [embed], components: [row] });
+});
 
+// Tickets
 client.on('interactionCreate', async interaction => {
   if (interaction.isButton()) {
     const { customId, user, guild } = interaction;
+    let ticketName = '';
+    let pingRoles = [];
 
-    if (customId === 'ticket_question') {
+    if (customId === 'achat') {
+      ticketName = `achat-${user.username}`;
+      pingRoles = ['1375220253553987767'];
+    } else if (customId === 'partenariat') {
+      ticketName = `partenariat-${user.username}`;
+      pingRoles = ['1375220253553987767', '1375220255080714330'];
+    } else if (customId === 'question') {
       const modal = new ModalBuilder()
-        .setTitle('Poser une question')
-        .setCustomId('modal_question')
+        .setCustomId('question_modal')
+        .setTitle('❓ Pose ta question')
         .addComponents(
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
               .setCustomId('question_input')
-              .setLabel('Ta question')
+              .setLabel('Quelle est ta question ?')
               .setStyle(TextInputStyle.Paragraph)
               .setRequired(true)
           )
@@ -78,126 +98,130 @@ client.on('interactionCreate', async interaction => {
       return interaction.showModal(modal);
     }
 
-    const type = customId.split('_')[1]; // achat / partenariat
-    const channelName = `${type}-${user.username}`;
-    const categoryId = process.env.TICKET_CATEGORY_ID;
-
-    const existing = guild.channels.cache.find(c => c.name === channelName);
-    if (existing) return interaction.reply({ content: `Tu as déjà un ticket ouvert : <#${existing.id}>`, ephemeral: true });
+    const existing = guild.channels.cache.find(c => c.name === ticketName);
+    if (existing) {
+      return interaction.reply({ content: `❌ Un ticket est déjà ouvert ici : <#${existing.id}>`, ephemeral: true });
+    }
 
     const channel = await guild.channels.create({
-      name: channelName,
-      parent: categoryId,
+      name: ticketName,
       type: 0,
+      parent: CATEGORY_ID,
       permissionOverwrites: [
-        { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-        { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-        { id: '1375220253553987767', allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-        { id: '1375220255080714330', allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
+        {
+          id: guild.id,
+          deny: [PermissionsBitField.Flags.ViewChannel],
+        },
+        {
+          id: user.id,
+          allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
+        },
+        ...pingRoles.map(roleId => ({
+          id: roleId,
+          allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
+        }))
       ]
     });
 
     const embed = new EmbedBuilder()
-      .setTitle(`📩 Ticket ${type}`)
-      .setDescription(`Bonjour ${user}, merci de nous avoir contactés.\nExplique ta demande ci-dessous.`)
+      .setTitle('🎫 Ticket créé')
+      .setDescription(`Merci ${user} d'avoir contacté le support KMS SHOP.\nUn membre du staff va vous répondre.`)
       .setColor('#eb37f1');
 
-    const closeBtn = new ActionRowBuilder().addComponents(
+    const closeButton = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('close_ticket')
         .setLabel('Fermer le ticket')
         .setStyle(ButtonStyle.Danger)
     );
 
-    await channel.send({
-      content:
-        type === 'achat'
-          ? `<@&1375220253553987767>`
-          : type === 'partenariat'
-          ? `<@&1375220253553987767> <@&1375220255080714330>`
-          : '',
-      embeds: [embed],
-      components: [closeBtn]
-    });
-
-    await interaction.reply({ content: `🎫 Ticket créé ici : <#${channel.id}>`, ephemeral: true });
+    await channel.send({ content: pingRoles.map(r => `<@&${r}>`).join(' '), embeds: [embed], components: [closeButton] });
+    await interaction.reply({ content: `🎫 Ton ticket a été créé ici : <#${channel.id}>`, ephemeral: true });
   }
 
-  if (interaction.isModalSubmit() && interaction.customId === 'modal_question') {
-    const question = interaction.fields.getTextInputValue('question_input');
+  // Modal : Question
+  if (interaction.isModalSubmit()) {
+    if (interaction.customId === 'question_modal') {
+      const content = interaction.fields.getTextInputValue('question_input');
+      const channel = await interaction.guild.channels.create({
+        name: `question-${interaction.user.username}`,
+        type: 0,
+        parent: CATEGORY_ID,
+        permissionOverwrites: [
+          {
+            id: interaction.guild.id,
+            deny: [PermissionsBitField.Flags.ViewChannel],
+          },
+          {
+            id: interaction.user.id,
+            allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
+          },
+          {
+            id: '1375220255080714330',
+            allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
+          }
+        ]
+      });
 
-    const channel = await interaction.guild.channels.create({
-      name: `question-${interaction.user.username}`,
-      parent: process.env.TICKET_CATEGORY_ID,
-      type: 0,
-      permissionOverwrites: [
-        { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-        { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-        { id: '1375220255080714330', allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
-      ]
-    });
+      const embed = new EmbedBuilder()
+        .setTitle('❓ Question posée')
+        .setDescription(`**Question :** ${content}\n**Auteur :** ${interaction.user}`)
+        .setColor('#eb37f1');
 
-    const embed = new EmbedBuilder()
-      .setTitle('❓ Nouvelle question')
-      .setDescription(`**Question posée :**\n${question}`)
-      .setColor('#eb37f1');
+      const closeButton = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('close_ticket')
+          .setLabel('Fermer le ticket')
+          .setStyle(ButtonStyle.Danger)
+      );
 
-    const closeBtn = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('close_ticket')
-        .setLabel('Fermer le ticket')
-        .setStyle(ButtonStyle.Danger)
-    );
-
-    await channel.send({
-      content: `<@&1375220255080714330>`,
-      embeds: [embed],
-      components: [closeBtn]
-    });
-
-    await interaction.reply({ content: `🎫 Question envoyée ici : <#${channel.id}>`, ephemeral: true });
+      await channel.send({ content: `<@&1375220255080714330>`, embeds: [embed], components: [closeButton] });
+      await interaction.reply({ content: `❓ Ticket de question créé ici : <#${channel.id}>`, ephemeral: true });
+    }
   }
 
-  if (interaction.isButton() && interaction.customId === 'close_ticket') {
-    const confirmEmbed = new EmbedBuilder()
-      .setColor('#eb37f1')
-      .setDescription('✅ Le ticket sera fermé dans **5 secondes**...');
-
-    await interaction.reply({ embeds: [confirmEmbed], ephemeral: true });
+  // Fermeture
+  if (interaction.customId === 'close_ticket') {
+    await interaction.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setDescription('❗ Fermeture du ticket dans 5 secondes...')
+          .setColor('#eb37f1')
+      ],
+      ephemeral: true
+    });
 
     setTimeout(async () => {
       const messages = await interaction.channel.messages.fetch({ limit: 100 });
-      const transcript = messages
+      const content = messages
         .reverse()
-        .map(m => `${m.author.tag} : ${m.content}`)
+        .map(m => `${m.author.tag} (${m.createdAt.toLocaleString()}): ${m.content}`)
         .join('\n');
 
-      const transcriptPath = path.join(__dirname, `transcript-${interaction.channel.id}.txt`);
-      fs.writeFileSync(transcriptPath, transcript);
+      const filename = `transcript-${interaction.channel.name}.txt`;
+      const filepath = path.join(__dirname, filename);
+      fs.writeFileSync(filepath, content);
 
-      const users = [...new Set(messages.map(m => m.author.tag))];
+      const participants = [...new Set(messages.map(m => m.author.tag))].join(', ');
 
       const logEmbed = new EmbedBuilder()
-        .setTitle('Ticket fermé')
+        .setTitle('🎟️ Ticket fermé')
+        .setColor('#2f3136')
         .addFields(
-          { name: '📂 Salon', value: interaction.channel.name, inline: true },
-          { name: '👤 Ouvert par', value: `<@${interaction.channel.topic}>`, inline: true },
-          { name: '🛠️ Fermé par', value: `<@${interaction.user.id}>`, inline: true },
-          { name: '👥 Utilisateurs ayant parlé', value: users.join(', ').slice(0, 1024) }
-        )
-        .setFooter({ text: `Fermé le ${new Date().toLocaleString()}` })
-        .setColor('#eb37f1');
+          { name: 'Ticket', value: interaction.channel.name, inline: true },
+          { name: 'Fermé par', value: interaction.user.tag, inline: true },
+          { name: 'Participants', value: participants || 'Aucun' },
+          { name: 'Date', value: new Date().toLocaleString() }
+        );
 
-      const logChannel = await client.channels.fetch(process.env.LOG_CHANNEL_ID);
-      if (logChannel) {
-        await logChannel.send({
-          embeds: [logEmbed],
-          files: [transcriptPath]
-        });
-      }
+      const logChannel = await client.channels.fetch(LOG_CHANNEL_ID);
+      await logChannel.send({
+        embeds: [logEmbed],
+        files: [filepath]
+      });
 
-      await interaction.channel.delete().catch(() => {});
-      fs.unlinkSync(transcriptPath);
+      await interaction.channel.delete();
+      fs.unlinkSync(filepath);
     }, 5000);
   }
 });
