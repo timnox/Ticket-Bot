@@ -8,10 +8,10 @@ const {
   ButtonBuilder,
   ActionRowBuilder,
   ButtonStyle,
-  ActivityType,
-  ChannelType
+  ActivityType
 } = require('discord.js');
 const fs = require('fs');
+const path = require('path');
 
 const client = new Client({
   intents: [
@@ -23,8 +23,8 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-client.once('ready', async () => {
-  console.log(`✅ Connecté en tant que ${client.user.tag}`);
+client.once('ready', () => {
+  console.log(`Connecté en tant que ${client.user.tag}`);
   client.user.setPresence({
     activities: [{
       name: 'Ticket KMS-SHOP',
@@ -33,22 +33,6 @@ client.once('ready', async () => {
     }],
     status: 'online'
   });
-
-  // Envoie le bouton de création de ticket dans le salon défini
-  const ticketChannel = await client.channels.fetch(process.env.TICKET_CHANNEL_ID);
-  const embed = new EmbedBuilder()
-    .setTitle('📨 Ouvre un ticket')
-    .setDescription('Clique sur le bouton ci-dessous pour créer un ticket.')
-    .setColor('#eb37f1');
-
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('create_ticket')
-      .setLabel('🎫 Créer un ticket')
-      .setStyle(ButtonStyle.Primary)
-  );
-
-  ticketChannel.send({ embeds: [embed], components: [row] });
 });
 
 client.on('interactionCreate', async interaction => {
@@ -57,8 +41,8 @@ client.on('interactionCreate', async interaction => {
   if (interaction.customId === 'create_ticket') {
     const channel = await interaction.guild.channels.create({
       name: `ticket-${interaction.user.username}`,
-      type: ChannelType.GuildText,
-      parent: process.env.TICKET_CATEGORY_ID,
+      type: 0, // GUILD_TEXT
+      parent: process.env.TICKET_CATEGORY_ID, // ID de la catégorie définie dans .env
       permissionOverwrites: [
         {
           id: interaction.guild.id,
@@ -88,14 +72,14 @@ client.on('interactionCreate', async interaction => {
       .setDescription(`Merci ${interaction.user} d'avoir contacté **Kms Shop**.\n__Explique ta demande ci-dessous.__`)
       .setColor('#eb37f1');
 
-    const closeBtn = new ActionRowBuilder().addComponents(
+    const button = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('close_ticket')
         .setLabel('Fermer le ticket')
         .setStyle(ButtonStyle.Danger)
     );
 
-    const ticketMessage = await channel.send({ embeds: [embed], components: [closeBtn] });
+    const ticketMessage = await channel.send({ embeds: [embed], components: [button] });
     await ticketMessage.pin();
 
     await channel.send({
@@ -109,73 +93,26 @@ client.on('interactionCreate', async interaction => {
   }
 
   if (interaction.customId === 'close_ticket') {
-    const confirmEmbed = new EmbedBuilder()
-      .setColor('#eb37f1')
-      .setTitle('⚠️ Confirmation')
-      .setDescription('Es-tu sûr de vouloir fermer ce ticket ?');
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('confirm_close')
-        .setLabel('Oui, fermer')
-        .setStyle(ButtonStyle.Danger),
-      new ButtonBuilder()
-        .setCustomId('cancel_close')
-        .setLabel('Annuler')
-        .setStyle(ButtonStyle.Secondary)
-    );
-
-    await interaction.reply({ embeds: [confirmEmbed], components: [row], ephemeral: true });
+    await interaction.channel.delete();
   }
+});
 
-  if (interaction.customId === 'cancel_close') {
-    await interaction.update({
-      content: '❌ Fermeture annulée.',
-      embeds: [],
-      components: [],
-    });
-  }
+client.on('ready', async () => {
+  const channel = await client.channels.fetch(process.env.TICKET_CHANNEL_ID);
 
-  if (interaction.customId === 'confirm_close') {
-    const channel = interaction.channel;
+  const embed = new EmbedBuilder()
+    .setTitle('Contacter le support')
+    .setDescription('Pour contacter le support de **Kms Shop**, clique sur le bouton __ci-dessous__.\n\n**Rappels :**\n- **__Sois courtois__**\n- **__Sois patient__**\n- **__Ne ping pas le staff__**\n\n-# **Note:** __***Nous n’acceptons pas les publicités & partenariat.***__')
+    .setColor('#eb37f1');
 
-    const messages = await channel.messages.fetch({ limit: 100 });
-    const content = messages
-      .reverse()
-      .map(m => `[${m.createdAt.toISOString()}] ${m.author.tag}: ${m.content}`)
-      .join('\n');
+  const button = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('create_ticket')
+      .setLabel('Créer un ticket')
+      .setStyle(ButtonStyle.Primary)
+  );
 
-    const transcriptPath = `./transcripts/transcript-${channel.id}.txt`;
-    fs.mkdirSync('./transcripts', { recursive: true });
-    fs.writeFileSync(transcriptPath, content);
-
-    const closingEmbed = new EmbedBuilder()
-      .setColor('#eb37f1')
-      .setTitle('Fermeture du ticket')
-      .setDescription('Ce ticket sera fermé dans **5 secondes**...');
-
-    await interaction.update({ embeds: [closingEmbed], components: [] });
-
-    const logChannel = await client.channels.fetch(process.env.TICKET_LOG_CHANNEL_ID);
-    const logEmbed = new EmbedBuilder()
-      .setColor('#eb37f1')
-      .setTitle('📁 Ticket fermé')
-      .addFields(
-        { name: 'Nom du salon', value: channel.name, inline: true },
-        { name: 'Fermé par', value: interaction.user.tag, inline: true }
-      )
-      .setTimestamp();
-
-    await logChannel.send({
-      embeds: [logEmbed],
-      files: [transcriptPath]
-    });
-
-    setTimeout(() => {
-      channel.delete().catch(console.error);
-      fs.unlinkSync(transcriptPath);
-    }, 5000);
-  }
+  await channel.send({ embeds: [embed], components: [button] });
 });
 
 client.login(process.env.TOKEN);
